@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CreditIQ — Explainable Credit Scoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design tokens ──────────────────────────────────────────────── */
+    :root {
+      --ink:        #0d0f14;
+      --ink-soft:   #4a4f5c;
+      --paper:      #f5f2eb;
+      --paper-warm: #ede8df;
+      --cream:      #faf8f3;
+      --gold:       #c8933a;
+      --gold-pale:  #f2e6cf;
+      --deny-red:   #c0392b;
+      --deny-pale:  #fdecea;
+      --approve-green: #1a7a4a;
+      --approve-pale:  #e6f4ed;
+      --border:     rgba(13,15,20,0.12);
+      --shadow-sm:  0 2px 8px rgba(13,15,20,0.08);
+      --shadow-md:  0 8px 32px rgba(13,15,20,0.12);
+      --shadow-lg:  0 20px 60px rgba(13,15,20,0.16);
+      --radius:     12px;
+      --radius-lg:  20px;
+      --transition: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse 80% 50% at 10% 20%, rgba(200,147,58,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 80%, rgba(200,147,58,0.04) 0%, transparent 50%);
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────── */
+    header {
+      background: var(--ink);
+      color: var(--cream);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .logo span { color: var(--gold); }
+    .header-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      background: rgba(200,147,58,0.15);
+      color: var(--gold);
+      border: 1px solid rgba(200,147,58,0.3);
+      padding: 0.25rem 0.75rem;
+      border-radius: 100px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ── Hero ────────────────────────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 4rem 2rem 3rem;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .hero-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1rem;
+    }
+    .hero h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+      color: var(--ink);
+    }
+    .hero h1 em { font-style: italic; color: var(--gold); }
+    .hero p {
+      font-size: 1.05rem;
+      color: var(--ink-soft);
+      line-height: 1.65;
+      font-weight: 300;
+    }
+
+    /* ── Main layout ─────────────────────────────────────────────────── */
+    .main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem 4rem;
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 2rem;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .main { grid-template-columns: 1fr; }
+    }
+
+    /* ── Form card ───────────────────────────────────────────────────── */
+    .form-card {
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .section-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: var(--ink);
+    }
+    .section-title .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--gold);
+    }
+
+    .fields-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+    @media (max-width: 640px) { .fields-grid { grid-template-columns: 1fr; } }
+
+    .field { display: flex; flex-direction: column; gap: 0.4rem; }
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+    .field-desc {
+      font-size: 0.72rem;
+      color: var(--ink-soft);
+      opacity: 0.7;
+      margin-top: -0.2rem;
+    }
+
+    select, input[type="number"] {
+      appearance: none;
+      background: var(--paper-warm);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.6rem 1rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      color: var(--ink);
+      transition: border-color var(--transition), box-shadow var(--transition);
+      width: 100%;
+    }
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234a4f5c' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 2.5rem;
+      cursor: pointer;
+    }
+    select:focus, input[type="number"]:focus {
+      outline: none;
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(200,147,58,0.12);
+    }
+
+    /* Range slider */
+    .range-wrap { display: flex; flex-direction: column; gap: 0.4rem; }
+    .range-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .range-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--gold);
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: var(--paper-warm);
+      border-radius: 3px;
+      border: 1.5px solid var(--border);
+      outline: none;
+      cursor: pointer;
+      transition: border-color var(--transition);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--gold);
+      border: 2px solid var(--cream);
+      box-shadow: 0 2px 6px rgba(200,147,58,0.4);
+      cursor: pointer;
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 3px 10px rgba(200,147,58,0.5);
+    }
+    input[type="range"]:focus { border-color: var(--gold); }
+
+    /* ── Submit button ────────────────────────────────────────────────── */
+    .btn-submit {
+      width: 100%;
+      margin-top: 1.75rem;
+      padding: 1rem 2rem;
+      background: var(--ink);
+      color: var(--cream);
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-submit:hover {
+      background: #1e2230;
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+    .btn-submit:active { transform: translateY(0); }
+    .btn-submit.loading { pointer-events: none; opacity: 0.7; }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .btn-submit.loading .spinner { display: block; }
+    .btn-submit.loading .btn-text { opacity: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Result panel ─────────────────────────────────────────────────── */
+    .result-panel { position: sticky; top: 80px; }
+
+    .result-card {
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .result-card.approved { border-color: var(--approve-green); box-shadow: 0 0 0 3px rgba(26,122,74,0.08), var(--shadow-md); }
+    .result-card.denied   { border-color: var(--deny-red);      box-shadow: 0 0 0 3px rgba(192,57,43,0.08),  var(--shadow-md); }
+
+    .result-placeholder {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--ink-soft);
+    }
+    .result-placeholder .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.4; }
+    .result-placeholder p { font-size: 0.9rem; line-height: 1.5; }
+
+    .decision-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1.2rem;
+      border-radius: 100px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+    .decision-badge.approved { background: var(--approve-pale); color: var(--approve-green); }
+    .decision-badge.denied   { background: var(--deny-pale);    color: var(--deny-red); }
+    .decision-badge .badge-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.6; transform: scale(0.85); }
+    }
+
+    .decision-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 2.2rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.25rem;
+    }
+    .decision-title.approved { color: var(--approve-green); }
+    .decision-title.denied   { color: var(--deny-red); }
+
+    .prob-label {
+      font-size: 0.8rem;
+      color: var(--ink-soft);
+      margin-bottom: 1.5rem;
+    }
+    .prob-label strong {
+      font-family: 'DM Mono', monospace;
+      font-size: 1rem;
+      color: var(--ink);
+    }
+
+    /* Risk gauge */
+    .risk-gauge {
+      margin-bottom: 1.75rem;
+    }
+    .gauge-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink-soft);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+    .gauge-level {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+    .gauge-track {
+      height: 8px;
+      background: var(--paper-warm);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .gauge-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      background: linear-gradient(90deg, #1a7a4a 0%, #f39c12 50%, #c0392b 100%);
+    }
+
+    /* Factor cards */
+    .factors-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-soft);
+      margin-bottom: 0.75rem;
+    }
+    .factor-list { display: flex; flex-direction: column; gap: 0.6rem; }
+    .factor-item {
+      background: var(--paper-warm);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      border-left: 3px solid transparent;
+      font-size: 0.85rem;
+      transition: transform var(--transition);
+    }
+    .factor-item:hover { transform: translateX(2px); }
+    .factor-item.risk    { border-color: var(--deny-red); }
+    .factor-item.protect { border-color: var(--approve-green); }
+    .factor-feature {
+      font-weight: 600;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.25rem;
+    }
+    .factor-feature.risk    { color: var(--deny-red); }
+    .factor-feature.protect { color: var(--approve-green); }
+    .factor-text { color: var(--ink-soft); line-height: 1.45; }
+
+    .demo-notice {
+      margin-top: 1.25rem;
+      padding: 0.6rem 0.9rem;
+      background: rgba(200,147,58,0.08);
+      border: 1px solid rgba(200,147,58,0.25);
+      border-radius: var(--radius);
+      font-size: 0.75rem;
+      color: var(--gold);
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Info strip ──────────────────────────────────────────────────── */
+    .info-strip {
+      max-width: 1200px;
+      margin: 0 auto 2rem;
+      padding: 0 2rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .info-tile {
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .info-tile-icon {
+      font-size: 1.5rem;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--gold-pale);
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+    .info-tile-body { min-width: 0; }
+    .info-tile-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-soft);
+      font-weight: 600;
+    }
+    .info-tile-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Error state */
+    .error-msg {
+      background: var(--deny-pale);
+      color: var(--deny-red);
+      border: 1px solid rgba(192,57,43,0.2);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    /* Fade-in animation */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeUp 0.45s cubic-bezier(0.4,0,0.2,1) forwards; }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.78rem;
+      color: var(--ink-soft);
+      border-top: 1px solid var(--border);
+      font-family: 'DM Mono', monospace;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <header>
+    <div class="header-inner">
+      <div class="logo">Credit<span>IQ</span></div>
+      <div class="header-badge">DNN + WOE + SHAP</div>
+    </div>
+  </header>
+
+  <!-- ── Hero ───────────────────────────────────────────────────────── -->
+  <div class="hero">
+    <div class="hero-eyebrow">Explainable AI · German Credit Dataset</div>
+    <h1>Credit Risk Assessment<br><em>You Can Trust</em></h1>
+    <p>A deep neural network trained on the UCI German Credit dataset, enhanced with Weight-of-Evidence feature engineering and SHAP-powered explanations — so every decision comes with a reason.</p>
+  </div>
+
+  <!-- ── Info strip ─────────────────────────────────────────────────── -->
+  <div class="info-strip">
+    <div class="info-tile">
+      <div class="info-tile-icon">🧠</div>
+      <div class="info-tile-body">
+        <div class="info-tile-label">Architecture</div>
+        <div class="info-tile-value">MLP 64→32→16→1</div>
+      </div>
+    </div>
+    <div class="info-tile">
+      <div class="info-tile-icon">📐</div>
+      <div class="info-tile-body">
+        <div class="info-tile-label">Feature Encoding</div>
+        <div class="info-tile-value">WOE + IV selection</div>
+      </div>
+    </div>
+    <div class="info-tile">
+      <div class="info-tile-icon">⚖️</div>
+      <div class="info-tile-body">
+        <div class="info-tile-label">Class Balance</div>
+        <div class="info-tile-value">SMOTE on train only</div>
+      </div>
+    </div>
+    <div class="info-tile">
+      <div class="info-tile-icon">🔍</div>
+      <div class="info-tile-body">
+        <div class="info-tile-label">Explainability</div>
+        <div class="info-tile-value">SHAP GradientExplainer</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Main ───────────────────────────────────────────────────────── -->
+  <div class="main">
+
+    <!-- Form card -->
+    <div class="form-card">
+      <div class="section-title"><div class="dot"></div> Applicant Profile</div>
+
+      <form id="creditForm" novalidate>
+        <div class="fields-grid">
+
+          <!-- Checking Account -->
+          <div class="field">
+            <label for="Attribute1">Checking Account Status</label>
+            <div class="field-desc">Status of existing checking account</div>
+            <select id="Attribute1" name="Attribute1">
+              <option value="0">No checking account</option>
+              <option value="1">Negative balance (&lt; 0 DM)</option>
+              <option value="2" selected>Low balance (0–200 DM)</option>
+              <option value="3">Healthy balance (≥ 200 DM)</option>
+            </select>
+          </div>
+
+          <!-- Credit History -->
+          <div class="field">
+            <label for="Attribute3">Credit History</label>
+            <div class="field-desc">Past repayment behaviour</div>
+            <select id="Attribute3" name="Attribute3">
+              <option value="0">No credits / all paid duly</option>
+              <option value="1">All credits paid back duly</option>
+              <option value="2" selected>Existing credits paid duly</option>
+              <option value="3">Past delays in payment</option>
+              <option value="4">Critical / other credits</option>
+            </select>
+          </div>
+
+          <!-- Loan Purpose -->
+          <div class="field">
+            <label for="Attribute4">Loan Purpose</label>
+            <div class="field-desc">Reason for the credit request</div>
+            <select id="Attribute4" name="Attribute4">
+              <option value="0">Car (new)</option>
+              <option value="1">Car (used)</option>
+              <option value="2" selected>Furniture / equipment</option>
+              <option value="3">Radio / TV</option>
+              <option value="4">Domestic appliances</option>
+              <option value="5">Repairs</option>
+              <option value="6">Education</option>
+              <option value="7">Vacation</option>
+              <option value="8">Retraining</option>
+              <option value="9">Business</option>
+              <option value="10">Other</option>
+            </select>
+          </div>
+
+          <!-- Savings -->
+          <div class="field">
+            <label for="Attribute6">Savings / Bonds</label>
+            <div class="field-desc">Balance in savings account or bonds</div>
+            <select id="Attribute6" name="Attribute6">
+              <option value="0">Unknown / no savings account</option>
+              <option value="1" selected>&lt; 100 DM</option>
+              <option value="2">100–500 DM</option>
+              <option value="3">500–1000 DM</option>
+              <option value="4">≥ 1000 DM</option>
+            </select>
+          </div>
+
+          <!-- Employment -->
+          <div class="field">
+            <label for="Attribute7">Employment Duration</label>
+            <div class="field-desc">Time at current employer</div>
+            <select id="Attribute7" name="Attribute7">
+              <option value="0">Unemployed</option>
+              <option value="1">&lt; 1 year</option>
+              <option value="2" selected>1–4 years</option>
+              <option value="3">4–7 years</option>
+              <option value="4">≥ 7 years</option>
+            </select>
+          </div>
+
+          <!-- Foreign Worker -->
+          <div class="field">
+            <label for="Attribute20">Foreign Worker</label>
+            <div class="field-desc">Is the applicant a foreign worker?</div>
+            <select id="Attribute20" name="Attribute20">
+              <option value="0">No</option>
+              <option value="1" selected>Yes</option>
+            </select>
+          </div>
+
+          <!-- Duration -->
+          <div class="field full">
+            <label>Loan Duration</label>
+            <div class="range-wrap">
+              <div class="range-header">
+                <div class="field-desc">Repayment period in months</div>
+                <div class="range-value" id="Attribute2Display">18 months</div>
+              </div>
+              <input type="range" id="Attribute2" name="Attribute2"
+                     min="4" max="72" step="1" value="18"
+                     oninput="document.getElementById('Attribute2Display').textContent = this.value + ' months'" />
+            </div>
+          </div>
+
+          <!-- Credit Amount -->
+          <div class="field full">
+            <label>Credit Amount</label>
+            <div class="range-wrap">
+              <div class="range-header">
+                <div class="field-desc">Total amount requested in Deutsche Marks</div>
+                <div class="range-value" id="Attribute5Display">DM 2,500</div>
+              </div>
+              <input type="range" id="Attribute5" name="Attribute5"
+                     min="250" max="18420" step="50" value="2500"
+                     oninput="document.getElementById('Attribute5Display').textContent = 'DM ' + parseInt(this.value).toLocaleString()" />
+            </div>
+          </div>
+
+          <!-- Age -->
+          <div class="field full">
+            <label>Applicant Age</label>
+            <div class="range-wrap">
+              <div class="range-header">
+                <div class="field-desc">Age in years</div>
+                <div class="range-value" id="Attribute13Display">35 yrs</div>
+              </div>
+              <input type="range" id="Attribute13" name="Attribute13"
+                     min="19" max="75" step="1" value="35"
+                     oninput="document.getElementById('Attribute13Display').textContent = this.value + ' yrs'" />
+            </div>
+          </div>
+
+          <!-- Instalment Rate -->
+          <div class="field full">
+            <label>Instalment Rate (% of income)</label>
+            <div class="range-wrap">
+              <div class="range-header">
+                <div class="field-desc">Monthly instalment as % of disposable income</div>
+                <div class="range-value" id="Attribute8Display">2%</div>
+              </div>
+              <input type="range" id="Attribute8" name="Attribute8"
+                     min="1" max="4" step="1" value="2"
+                     oninput="document.getElementById('Attribute8Display').textContent = this.value + '%'" />
+            </div>
+          </div>
+
+        </div><!-- /fields-grid -->
+
+        <div id="errorMsg" class="error-msg"></div>
+
+        <button type="submit" class="btn-submit" id="submitBtn">
+          <div class="spinner"></div>
+          <span class="btn-text">Assess Credit Risk →</span>
+        </button>
+      </form>
+    </div><!-- /form-card -->
+
+    <!-- Result panel -->
+    <div class="result-panel">
+      <div class="result-card" id="resultCard">
+        <div class="result-placeholder" id="resultPlaceholder">
+          <div class="icon">📋</div>
+          <p>Fill in the applicant profile and click <strong>Assess Credit Risk</strong> to see the model's decision and SHAP-based explanation.</p>
+        </div>
+
+        <div id="resultContent" style="display:none"></div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <footer>
+    CreditIQ · DNN + WOE + SHAP · UCI German Credit Dataset (Hofmann, 1994) · Lundberg &amp; Lee, NIPS 2017
+  </footer>
+
+<script>
+const form = document.getElementById('creditForm');
+const submitBtn = document.getElementById('submitBtn');
+const resultCard = document.getElementById('resultCard');
+const resultPlaceholder = document.getElementById('resultPlaceholder');
+const resultContent = document.getElementById('resultContent');
+const errorMsg = document.getElementById('errorMsg');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorMsg.style.display = 'none';
+
+  // Collect form data
+  const data = {};
+  const inputs = form.querySelectorAll('input, select');
+  inputs.forEach(el => { if (el.name) data[el.name] = parseFloat(el.value); });
+
+  // Loading state
+  submitBtn.classList.add('loading');
+
+  try {
+    const res = await fetch('/api/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const json = await res.json();
+
+    if (!res.ok || json.error) {
+      throw new Error(json.error || 'Server error');
+    }
+
+    renderResult(json);
+
+  } catch (err) {
+    errorMsg.textContent = '⚠️ ' + (err.message || 'Connection failed. Is Flask running?');
+    errorMsg.style.display = 'block';
+  } finally {
+    submitBtn.classList.remove('loading');
+  }
+});
+
+
+function renderResult(r) {
+  const approved = r.decision === 'APPROVED';
+  const cls      = approved ? 'approved' : 'denied';
+  const emoji    = approved ? '✅' : '❌';
+  const prob     = Math.round(r.probability * 100);
+
+  // Risk colour
+  const riskColors = {
+    'Very Low':  '#1a7a4a',
+    'Low':       '#27ae60',
+    'Medium':    '#f39c12',
+    'High':      '#e67e22',
+    'Very High': '#c0392b'
+  };
+  const riskColor = riskColors[r.risk_level] || '#f39c12';
+
+  // Factor HTML
+  const factorHtml = (r.explanations || []).map(f => `
+    <div class="factor-item ${f.direction} fade-in">
+      <div class="factor-feature ${f.direction}">
+        ${f.direction === 'risk' ? '▲' : '▼'} ${f.feature}
+        <span style="font-weight:400;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;opacity:0.6;">${f.impact} impact</span>
+      </div>
+      <div class="factor-text">${f.explanation}</div>
+    </div>
+  `).join('');
+
+  const demoNotice = r.demo_mode
+    ? `<div class="demo-notice">⚡ Demo mode — heuristic predictions. Load a trained .pt model for real inference.</div>`
+    : '';
+
+  resultContent.innerHTML = `
+    <div class="fade-in">
+      <div class="decision-badge ${cls}">
+        <div class="badge-dot"></div>
+        ${cls.toUpperCase()}
+      </div>
+      <div class="decision-title ${cls}">${r.decision} ${emoji}</div>
+      <div class="prob-label">
+        Default probability: <strong>${r.probability_pct}</strong>
+      </div>
+
+      <div class="risk-gauge">
+        <div class="gauge-header">
+          <span>Risk Level</span>
+          <span class="gauge-level" style="color:${riskColor}">${r.risk_level}</span>
+        </div>
+        <div class="gauge-track">
+          <div class="gauge-fill" style="width:${prob}%"></div>
+        </div>
+      </div>
+
+      ${factorHtml.length ? `
+        <div class="factors-title">Key Factors (SHAP-Style)</div>
+        <div class="factor-list">${factorHtml}</div>
+      ` : ''}
+
+      ${demoNotice}
+    </div>
+  `;
+
+  resultPlaceholder.style.display = 'none';
+  resultContent.style.display = 'block';
+
+  // Update card border class
+  resultCard.classList.remove('approved', 'denied');
+  resultCard.classList.add(cls);
+
+  // Scroll to result on mobile
+  if (window.innerWidth < 900) {
+    resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+</script>
+
+</body>
+</html>
